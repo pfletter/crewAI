@@ -2,33 +2,37 @@ import json
 import os
 from typing import Dict, Optional
 
-from pydantic import BaseModel, Field, PrivateAttr, ValidationError, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
 
 class I18N(BaseModel):
-    _translations: Optional[Dict[str, str]] = PrivateAttr()
-    language: Optional[str] = Field(
-        default="en",
-        description="Language used to load translations",
+    _prompts: Dict[str, Dict[str, str]] = PrivateAttr()
+    prompt_file: Optional[str] = Field(
+        default=None,
+        description="Path to the prompt_file file to load",
     )
 
     @model_validator(mode="after")
-    def load_translation(self) -> "I18N":
-        """Load translations from a JSON file based on the specified language."""
+    def load_prompts(self) -> "I18N":
+        """Load prompts from a JSON file."""
         try:
-            dir_path = os.path.dirname(os.path.realpath(__file__))
-            prompts_path = os.path.join(
-                dir_path, f"../translations/{self.language}.json"
-            )
+            if self.prompt_file:
+                with open(self.prompt_file, "r") as f:
+                    self._prompts = json.load(f)
+            else:
+                dir_path = os.path.dirname(os.path.realpath(__file__))
+                prompts_path = os.path.join(dir_path, "../translations/en.json")
 
-            with open(prompts_path, "r") as f:
-                self._translations = json.load(f)
+                with open(prompts_path, "r") as f:
+                    self._prompts = json.load(f)
         except FileNotFoundError:
-            raise ValidationError(
-                f"Trasnlation file for language '{self.language}' not found."
-            )
+            raise Exception(f"Prompt file '{self.prompt_file}' not found.")
         except json.JSONDecodeError:
-            raise ValidationError(f"Error decoding JSON from the prompts file.")
+            raise Exception("Error decoding JSON from the prompts file.")
+
+        if not self._prompts:
+            self._prompts = {}
+
         return self
 
     def slice(self, slice: str) -> str:
@@ -40,8 +44,8 @@ class I18N(BaseModel):
     def tools(self, error: str) -> str:
         return self.retrieve("tools", error)
 
-    def retrieve(self, kind, key):
+    def retrieve(self, kind, key) -> str:
         try:
-            return self._translations[kind].get(key)
-        except:
-            raise ValidationError(f"Translation for '{kind}':'{key}'  not found.")
+            return self._prompts[kind][key]
+        except Exception as _:
+            raise Exception(f"Prompt for '{kind}':'{key}'  not found.")

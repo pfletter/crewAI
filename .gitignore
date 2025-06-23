@@ -5,4 +5,10 @@ dist/
 .env
 assets/*
 .idea
+test/
+docs_crew/
+chroma.sqlite3
+old_en.json
+db/
 test.py
+rc-tests/*
